@@ -1,0 +1,30 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert/strict');
+const path = require('path');
+const context = vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../source/guard-core.js'), 'utf8'), context);
+const Engine = context.GuardCore.Engine;
+let count = 0;
+function test(name, fn) { fn(); count++; console.log('PASS ' + name); }
+function armed(threshold = null) { const e = new Engine(20, 10, threshold); e.observe(0, -50); e.observe(1, -50); return e; }
+test('no radio packets never means present', () => assert.equal(new Engine(20, 10, null).tick(300).armed, false));
+test('cached/connected device without packets never arms', () => {const e=new Engine(20,10,null); for(let i=0;i<100;i++) e.tick(i); assert.equal(e.armed,false);});
+test('one packet does not arm', () => {const e=new Engine(20,10,null);e.observe(0,-50);assert.equal(e.tick(1).armed,false);});
+test('two fresh packets arm', () => assert.equal(armed().tick(2).armed,true));
+test('stale RSSI does not keep device near', () => assert.equal(armed().tick(12).state,'countdown'));
+test('signal expiration plus delay', () => {const e=armed();assert.equal(e.tick(30).trigger,false);assert.equal(e.tick(31).trigger,true);});
+test('only one trigger per loss', () => {const e=armed();e.tick(31);assert.equal(e.tick(60).trigger,false);});
+test('single return packet cannot rearm', () => {const e=armed();e.tick(31);e.observe(40,-45);assert.equal(e.latched,true);});
+test('two return packets rearm without unlocking', () => {const e=armed();e.tick(31);e.observe(40,-45);e.observe(41,-45);assert.equal(e.latched,false);assert.equal(e.tick(42).trigger,false);});
+test('short interruption clears countdown', () => {const e=armed();e.tick(15);e.observe(16,-50);assert.equal(e.tick(20).elapsed,0);});
+test('weak signal uses smoothed value', () => {const e=armed(-75);e.observe(2,-95);assert.equal(e.tick(3).state,'near');});
+test('sustained weak signal triggers', () => {const e=armed(-75);for(let i=2;i<28;i++)e.observe(i,-95);assert.equal(e.tick(28).trigger,true);});
+test('127 invalid RSSI never refreshes timestamp', () => {const e=armed();assert.equal(e.observe(25,127),false);assert.equal(e.tick(31).trigger,true);});
+test('zero invalid RSSI is rejected', () => assert.equal(armed().observe(3,0),false));
+test('NaN is rejected', () => assert.equal(armed().observe(3,NaN),false));
+test('old packet is rejected', () => assert.equal(armed().observe(0,-30),false));
+test('device change requires new engine and fresh arming', () => {let e=armed();e=new Engine(20,10,null);assert.equal(e.tick(50).armed,false);});
+test('widely spaced packets cannot arm', () => {const e=new Engine(20,10,null);e.observe(0,-50);e.observe(30,-50);assert.equal(e.armed,false);});
+test('radio callback stops: loss deadline still fires', () => {const e=armed();assert.equal(e.tick(500).trigger,true);});
+console.log(`${count} production-core tests passed. Native macOS build/Bluetooth/WeChat not tested here.`);

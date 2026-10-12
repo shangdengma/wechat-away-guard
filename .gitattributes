@@ -1,0 +1,10 @@
+* text=auto
+*.command text eol=lf
+*.m text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.plist text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.cs text eol=crlf
+*.ps1 text eol=crlf

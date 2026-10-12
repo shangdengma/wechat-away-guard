@@ -1,0 +1,1 @@
+﻿PASS 31 tests. No Bluetooth, key injection or WeChat operation performed.

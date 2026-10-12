@@ -1,0 +1,10 @@
+*.exe
+*.pdb
+*.zip
+*.log
+profile.xml*
+.env*
+.DS_Store
+build/
+node_modules/
+work/
